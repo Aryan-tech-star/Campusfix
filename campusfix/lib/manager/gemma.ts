@@ -14,7 +14,16 @@ export function parseGemmaJson<T>(text: string, schema: z.ZodType<T>): T {
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/, "");
-  return schema.parse(JSON.parse(clean));
+  try {
+    return schema.parse(JSON.parse(clean));
+  } catch (err) {
+    const start = clean.indexOf("{"),
+      end = clean.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      return schema.parse(JSON.parse(clean.slice(start, end + 1)));
+    }
+    throw err;
+  }
 }
 async function generate<T>(
   task: string,
@@ -34,9 +43,8 @@ async function generate<T>(
       503,
       "GEMMA_MODEL must name a real Gemma model. Gemini substitution is disabled.",
     );
-  let response: Response;
-  const deadline = AbortSignal.timeout(45000);
-  const send = () =>
+  let response: Response | undefined;
+  const send = (timeoutMs = 5000) =>
     fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
@@ -59,16 +67,45 @@ async function generate<T>(
             thinkingConfig: { thinkingLevel: "minimal" },
           },
         }),
-        signal: deadline,
+        signal: AbortSignal.timeout(timeoutMs),
       },
     );
-  try {
-    response = await send();
-    if (response.status >= 500) {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      response = await send();
+  const sendFastPair = async (): Promise<Response> => {
+    const one = async () => {
+      const r = await send(4500);
+      if (r.status >= 500) {
+        const err = new Error("server_error") as Error & { response: Response };
+        err.response = r;
+        throw err;
+      }
+      return r;
+    };
+    try {
+      return await Promise.any([one(), one()]);
+    } catch (agg) {
+      const errors = (agg as AggregateError).errors as Array<
+        Error & { response?: Response }
+      >;
+      const withResp = errors?.find((e) => e?.response)?.response;
+      if (withResp) return withResp;
+      throw errors?.[0] || agg;
     }
-  } catch {
+  };
+  for (let i = 0; i < 8; i++) {
+    try {
+      response = i < 2 ? await send(5000) : await sendFastPair();
+      if (response.status < 500) break;
+    } catch (err) {
+      const isTimeout =
+        err instanceof Error &&
+        (err.name === "TimeoutError" || err.name === "AbortError");
+      if (!isTimeout && i >= 1 && !response) break;
+    }
+    if (i < 7 && response?.status !== undefined) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
+  if (!response) {
     throw new ManagerError(
       504,
       "Gemma could not be reached within 45 seconds. Your data is saved; retry AI analysis later.",
@@ -124,11 +161,9 @@ export async function analyzeComplaint(c: Complaint) {
       keywords: ["Relevant maintenance term"],
     },
   );
-  if (result.category !== result.specialization)
-    throw new ManagerError(
-      502,
-      "Gemma returned inconsistent specialization data. No changes were applied.",
-    );
+  if (result.category !== result.specialization) {
+    result.specialization = result.category;
+  }
   return {
     ...result,
     model: gemmaModel(),

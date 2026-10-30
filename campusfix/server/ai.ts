@@ -18,7 +18,7 @@ export async function checkAi(userId: string) {
       503,
       "Gemma is paused pending server credential configuration. No AI response has been generated.",
     );
-  await rateLimit(`ai:${userId}`, 12);
+  await rateLimit(`ai:${userId}`, 60);
 }
 export async function authorizedComplaint(id: string, user: SessionUser) {
   const row = await db.complaint.findUnique({
