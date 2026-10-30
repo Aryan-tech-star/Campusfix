@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  STUDENT
+  MANAGER
+  TECHNICIAN
+}
+
+enum AssignmentStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  COMPLETED
+  CANCELLED
+}
+
+model Workspace {
+  id       Int @id @default(1)
+  revision Int @default(1)
+  settings Json
+  demo     Boolean @default(false)
+}
+
+model User {
+  id           String @id @default(uuid())
+  email        String @unique
+  name         String
+  phone        String @default("")
+  passwordHash String
+  role         Role
+  active       Boolean @default(true)
+  roomId       String?
+  room         Room? @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  technician   Technician?
+  complaints   Complaint[]
+  sessions     Session[]
+  notifications Notification[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Session {
+  tokenHash String @id
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([expiresAt])
+  @@index([userId])
+}
+
+model RateLimit {
+  key   String @id
+  count Int
+  until DateTime
+  @@index([until])
+}
+
+model Hostel {
+  id             String @id @default(uuid())
+  name           String
+  address        String
+  roomCount      Int
+  lat            Float
+  lng            Float
+  membership     Float
+  inviteCodeHash String?
+  rooms          Room[]
+  complaints     Complaint[]
+}
+
+model Room {
+  id         String @id @default(uuid())
+  hostelId   String
+  hostel     Hostel @relation(fields: [hostelId], references: [id], onDelete: Restrict)
+  number     String
+  residents  User[]
+  complaints Complaint[]
+  @@unique([hostelId, number])
+}
+
+model Technician {
+  id              String @id @default(uuid())
+  userId          String? @unique
+  user            User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+  name            String
+  initials        String
+  specialization  String[]
+  available       Boolean @default(false)
+  verified        Boolean @default(false)
+  reliability     Float @default(0)
+  rating          Float @default(0)
+  jobsCompleted   Int @default(0)
+  responseMinutes Int @default(0)
+  lat             Float @default(18.52)
+  lng             Float @default(73.85)
+  phone           String @default("")
+  color           String @default("#e8f0ff")
+  serviceArea     String @default("Pune · local hostel network")
+  bio             String @default("")
+  complaints      Complaint[]
+  assignments     Assignment[]
+  repairs         RepairReport[]
+}
+
+model Complaint {
+  id           String @id
+  studentId    String?
+  student      User? @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  title        String
+  description  String
+  reporter     String
+  hostelId     String
+  hostel       Hostel @relation(fields: [hostelId], references: [id], onDelete: Restrict)
+  roomId       String
+  room         Room @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  category     String
+  urgency      String
+  status       String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  version      Int @default(1)
+  technicianId String?
+  technician   Technician? @relation(fields: [technicianId], references: [id], onDelete: Restrict)
+  estimate     Float?
+  images       String[]
+  analysis     Json?
+  repairs      RepairReport[]
+  history      StatusHistory[]
+  assignments  Assignment[]
+  notifications Notification[]
+  @@index([studentId, createdAt])
+  @@index([technicianId, status])
+  @@index([hostelId, status])
+}
+
+model Assignment {
+  id            String @id @default(uuid())
+  complaintId   String
+  complaint     Complaint @relation(fields: [complaintId], references: [id], onDelete: Restrict)
+  technicianId  String
+  technician    Technician @relation(fields: [technicianId], references: [id], onDelete: Restrict)
+  status        AssignmentStatus @default(PENDING)
+  instructions  String @default("")
+  assignedAt    DateTime @default(now())
+  acceptedAt    DateTime?
+  declineReason String?
+  endedAt       DateTime?
+  @@index([complaintId, assignedAt])
+  @@index([technicianId, status])
+}
+
+model RepairReport {
+  id           String @id @default(uuid())
+  complaintId  String
+  complaint    Complaint @relation(fields: [complaintId], references: [id], onDelete: Restrict)
+  technicianId String
+  technician   Technician @relation(fields: [technicianId], references: [id], onDelete: Restrict)
+  summary      String
+  workPerformed String @default("")
+  labour       Float
+  images       String[]
+  parts        RepairPart[]
+  completedAt  DateTime @default(now())
+  verifiedAt   DateTime?
+  reopenedAt   DateTime?
+  @@index([complaintId, completedAt])
+}
+
+model RepairPart {
+  id           String @id @default(uuid())
+  reportId     String
+  report       RepairReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  name         String
+  quantity     Int
+  unitCost     Float
+}
+
+model StatusHistory {
+  id          String @id @default(uuid())
+  complaintId String
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Restrict)
+  at          DateTime @default(now())
+  actor       String
+  action      String
+  note        String
+  @@index([complaintId, at])
+}
+
+model Notification {
+  id          String @id @default(uuid())
+  userId      String
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  complaintId String?
+  complaint   Complaint? @relation(fields: [complaintId], references: [id], onDelete: Restrict)
+  title       String
+  message     String
+  createdAt   DateTime @default(now())
+  readAt      DateTime?
+  @@index([userId, createdAt])
+}

@@ -1,0 +1,60 @@
+{
+  "name": "campusfix",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "tsx --test tests/manager.test.ts",
+    "typecheck": "tsc --noEmit",
+    "dev:api": "tsx watch server/index.ts",
+    "build:api": "prisma generate && esbuild server/index.ts --bundle --platform=node --target=node24 --format=esm --packages=external --outfile=build/api/index.js",
+    "start:api": "node build/api/index.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "tsx server/seed.ts",
+    "test:integration": "tsx --test tests/portals.test.ts",
+    "db:bootstrap": "tsx server/bootstrap.ts",
+    "test:production": "tsx tests/production-smoke.mts"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0",
+    "lucide-react": "^0.468.0",
+    "next": "16.4.3",
+    "pg": "^8.16.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "recharts": "^3.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/turbopack": "^4",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24",
+    "@types/pg": "^8.15.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "esbuild": "^0.28.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.3",
+    "prettier": "^3.9.10",
+    "prisma": "^7.10.1",
+    "tailwindcss": "^4",
+    "tsx": "^4.20.0",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=24.0.0 <27"
+  },
+  "type": "module"
+}
